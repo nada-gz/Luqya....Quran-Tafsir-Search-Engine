@@ -27,3 +27,14 @@ class Tafsir(SQLModel, table=True):
     text: str
     
     ayah: Optional[Ayah] = Relationship(back_populates="tafsirs")
+
+class Morphology(SQLModel, table=True):
+    id: int = Field(default=None, primary_key=True)
+    surah_number: int = Field(index=True)
+    ayah_number: int = Field(index=True)
+    word_number: int
+    segment_number: int
+    text: str
+    root: Optional[str] = Field(default=None, index=True)
+    lemma: Optional[str] = Field(default=None)
+
