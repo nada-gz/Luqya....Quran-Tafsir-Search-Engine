@@ -9,15 +9,20 @@ client = meilisearch.Client('http://127.0.0.1:7700', 'quran_search_master_key')
 
 def normalize_arabic(text):
     if not text: return ""
-    # Strip Tashkeel
-    tashkeel = re.compile(r'[\u064B-\u065F\u0670]')
-    text = re.sub(tashkeel, '', text)
-    # Normalize Alif variants (including Alif Wasla)
-    text = re.sub(r'[إأآٱ]', 'ا', text)
-    # Normalize Hamza variants
-    text = re.sub(r'[ؤ]', 'و', text)
-    text = re.sub(r'[ئ]', 'ي', text)
-    return text
+    # Replace hamza-above and hamza-below marks with Alif to preserve the sound seat
+    text = re.sub(r'[\u0654\u0655]', 'ا', text)
+    # Strip all Quranic marks, Tashkeel, and punctuation
+    marks = re.compile(r'[\u0610-\u061A\u064B-\u0653\u0656-\u065F\u06D6-\u06ED]')
+    text = re.sub(marks, '', text)
+    # Normalize Alif and hamza variants to a plain Alif
+    text = re.sub(r'[إأآٱءئؤ]', 'ا', text)
+    # Standardize YEH variants
+    text = re.sub(r'[ى]', 'ي', text)
+    # Strip Tatweel
+    text = re.sub(r'[\u0640]', '', text)
+    # Collapse duplicate Alifs
+    text = re.sub(r'ا+', 'ا', text)
+    return text.strip()
 
 def sync_database():
     print("Connecting to MeiliSearch...")
@@ -36,17 +41,15 @@ def sync_database():
             'tafsir_advanced_tabari'
         ],
         'typoTolerance': {
-            'minWordSizeForTypos': {
-                'oneTypo': 8,   # Only allow one typo for words >= 8 chars
-                'twoTypos': 12  # Only allow two typos for words >= 12 chars
-            }
+            'enabled': False
         },
         'rankingRules': [
-            'exactness', # Prefer exact matches first
+            'exactness',
             'words',
-            'attribute',
+            'surah_number:asc',
+            'ayah_number:asc',
             'proximity',
-            'typo'
+            'attribute'
         ],
         'filterableAttributes': [
             'surah_number',
