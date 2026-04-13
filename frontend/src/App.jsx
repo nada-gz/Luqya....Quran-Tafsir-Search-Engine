@@ -3,6 +3,19 @@ import axios from 'axios';
 import { Search, Moon, Sun, Sparkles, Book, Library, BookOpen } from 'lucide-react';
 import './index.css';
 
+// Integrated Logo Component: Search icon inside the letter 'ق'
+const SearchInLogo = ({ color = "var(--accent-primary)" }) => (
+  <div className="brand-logo-container">
+    <span className="brand-name">لُـقـيَـا</span>
+    <div className="qaf-search-lens">
+      <svg width="24" height="24" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="45" cy="45" r="35" stroke={color} strokeWidth="8" />
+        <path d="M70 70L85 85" stroke={color} strokeWidth="10" strokeLinecap="round" />
+      </svg>
+    </div>
+  </div>
+);
+
 // ResultCard sub-component with interactive toggles
 const ResultCard = ({ hit, mode }) => {
   const [activeTafsir, setActiveTafsir] = useState(null);
@@ -129,13 +142,12 @@ function App() {
   return (
     <div className="app-container">
       <header className="header">
-        <div className="brand-title">
-          <BookOpen className="text-accent" size={32} />
-          <span>QuranLens</span>
-        </div>
         <button onClick={toggleTheme} className="theme-toggle" title="تبديل المظهر">
           {theme === 'light' ? <Moon size={22} /> : <Sun size={22} />}
         </button>
+        <div className="brand-title">
+          <SearchInLogo />
+        </div>
       </header>
 
       <section className="search-module">
@@ -186,7 +198,7 @@ function App() {
       {loading && (
         <div className="loading-state">
           <div className="loading-spinner"><Search size={40} /></div>
-          <p dir="rtl">جاري البحث في آيات الله...</p>
+          <p dir="rtl">جاري البحث في آيات الله عبر لُقْيَا...</p>
         </div>
       )}
 
@@ -215,7 +227,9 @@ function App() {
       
       {!results && !loading && !error && (
         <div className="empty-state">
-          <BookOpen size={64} style={{ opacity: 0.1, margin: '0 auto 1.5rem' }} />
+          <div style={{ opacity: 0.1, margin: '0 auto 2.5rem', display: 'flex', justifyContent: 'center', transform: 'scale(2.5)' }}>
+            <SearchInLogo />
+          </div>
           <p className="arabic-text" style={{ fontSize: '1.5rem' }}>أَفَلَا يَتَدَبَّرُونَ الْقُرْآنَ أَمْ عَلَىٰ قُلُوبٍ أَقْفَالُهَا</p>
           <p style={{ fontSize: '1rem', marginTop: '0.75rem', opacity: 0.6 }}>"Then do they not reflect upon the Qur'an, or are there locks upon [their] hearts?" (47:24)</p>
         </div>
