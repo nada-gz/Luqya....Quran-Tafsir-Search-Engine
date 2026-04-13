@@ -60,7 +60,7 @@ function App() {
           <BookOpen className="text-accent" size={28} />
           <span>QuranLens</span>
         </div>
-        <button onClick={toggleTheme} className="theme-toggle" aria-label="Toggle Theme">
+        <button onClick={toggleTheme} className="theme-toggle" aria-label="تبديل المظهر">
           {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
         </button>
       </header>
@@ -86,22 +86,22 @@ function App() {
               className={`mode-btn ${mode === 'ayah_only' ? 'active' : ''}`}
               onClick={() => setMode('ayah_only')}
             >
-              Exact Verse
+              ابحث في آيات القرآن
             </button>
             <button 
               type="button" 
               className={`mode-btn ${mode === 'tafsir_only' ? 'active' : ''}`}
               onClick={() => setMode('tafsir_only')}
             >
-              Tafsir Lookup
+              ابحث في كتب التفسير
             </button>
             <button 
               type="button" 
               className={`mode-btn ${mode === 'semantic_root' ? 'active' : ''}`}
               onClick={() => setMode('semantic_root')}
             >
-              <Sparkles size={14} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'text-bottom' }} />
-              Semantic Concept
+              <Sparkles size={14} style={{ display: 'inline', marginLeft: '4px', verticalAlign: 'text-bottom' }} />
+              البحث بالمعاني والمقاصد
             </button>
           </div>
         </form>
@@ -111,7 +111,7 @@ function App() {
       {loading && (
         <div className="loading-state">
           <div className="loading-spinner"><Search size={32} /></div>
-          <p>Searching the depths of the Quran...</p>
+          <p>جاري البحث في آيات الله وتفاسيرها...</p>
         </div>
       )}
 
@@ -124,10 +124,10 @@ function App() {
       {/* Results */}
       {results && !loading && (
         <section className="results-area">
-          <div className="results-info">
-            Found {results.estimatedTotalHits} results in {results.processingTimeMs}ms
+          <div className="results-info" dir="rtl">
+            تم العثور على {results.estimatedTotalHits} نتيجة في {results.processingTimeMs} ملي ثانية
             {results.semantic_root_used && (
-              <span> • Mapped to Root: <strong dir="rtl" className="arabic-text" style={{ fontSize: '1.2rem' }}>{results.semantic_root_used}</strong></span>
+              <span> • تم الربط بجذر: <strong className="arabic-text" style={{ fontSize: '1.2rem' }}>{results.semantic_root_used}</strong></span>
             )}
           </div>
           
@@ -135,23 +135,22 @@ function App() {
             {results.results.map((hit) => (
               <div key={hit.id} className="result-card">
                 <div className="badge">
-                  <Sparkles size={12} /> {hit.explanation}
+                  <Sparkles size={12} /> {hit.explanation === "keyword found directly in the Ayah text" ? "تم العثور على الكلمة في نص الآية" : 
+                                          hit.explanation.startsWith("Categorized under Linguistic Root:") ? `مصنف تحت الجذر اللغوي: ${hit.semantic_root_used || results.semantic_root_used}` : 
+                                          hit.explanation}
                 </div>
                 
                 <div className="ayah-header">
-                  <span className="ayah-reference">Surah {hit.surah_name} ({hit.surah_number}:{hit.ayah_number})</span>
+                  <span className="ayah-reference">سورة {hit.surah_name} ({hit.surah_number}:{hit.ayah_number})</span>
                 </div>
                 
                 <div className="ayah-text arabic-text">
-                  {/* To display highlights properly, we render it directly but ideally we parse the matches. 
-                      Since we dropped matchesPosition for simplicity, we render Uthmani text. */}
                   {hit.text_uthmani}
                 </div>
                 
-                {/* Always show Tafsir context if it matched in Tafsir mode, or conditionally */}
                 {(mode === 'tafsir_only' || hit.tafsir_simple_saadi) && (
                   <div className="tafsir-container">
-                    <div className="tafsir-title">Tafsir Al-Saadi</div>
+                    <div className="tafsir-title">تفسير السعدي</div>
                     <div className="tafsir-text arabic-text">
                       {hit.tafsir_simple_saadi}
                     </div>
@@ -166,7 +165,7 @@ function App() {
       {!results && !loading && !error && (
         <div className="empty-state">
           <BookOpen size={48} style={{ opacity: 0.1, margin: '0 auto 1rem' }} />
-          <p>أَفَلَا يَتَدَبَّرُونَ الْقُرْآنَ أَمْ عَلَىٰ قُلُوبٍ أَقْفَالُهَا</p>
+          <p className="arabic-text">أَفَلَا يَتَدَبَّرُونَ الْقُرْآنَ أَمْ عَلَىٰ قُلُوبٍ أَقْفَالُهَا</p>
           <p style={{ fontSize: '0.85rem', marginTop: '0.5rem', opacity: 0.7 }}>"Then do they not reflect upon the Qur'an, or are there locks upon [their] hearts?" (47:24)</p>
         </div>
       )}

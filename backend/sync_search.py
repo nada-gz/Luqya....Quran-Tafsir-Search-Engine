@@ -1,10 +1,23 @@
 import meilisearch
 from sqlmodel import Session
+import re
 # Ignore the import error below if Pyright complains; it runs fine at runtime
 from database import engine
 from models import Surah, Ayah, Tafsir, Morphology
 
 client = meilisearch.Client('http://127.0.0.1:7700', 'quran_search_master_key')
+
+def normalize_arabic(text):
+    if not text: return ""
+    # Strip Tashkeel
+    tashkeel = re.compile(r'[\u064B-\u065F\u0670]')
+    text = re.sub(tashkeel, '', text)
+    # Normalize Alif
+    text = re.sub(r'[إأآ]', 'ا', text)
+    # Normalize Hamza on Waw/Ya
+    text = re.sub(r'[ؤ]', 'و', text)
+    text = re.sub(r'[ئ]', 'ي', text)
+    return text
 
 def sync_database():
     print("Connecting to MeiliSearch...")
@@ -13,6 +26,7 @@ def sync_database():
     # Setup index settings for Arabic search
     index.update_settings({
         'searchableAttributes': [
+            'text_normalized',
             'text_uthmani',
             'roots',
             'lemmas',
@@ -55,6 +69,7 @@ def sync_database():
                 'surah_name': surah.name_arabic,
                 'ayah_number': ayah.ayah_number,
                 'text_uthmani': ayah.text_uthmani,
+                'text_normalized': normalize_arabic(ayah.text_uthmani),
                 'category': ayah.category or '',
                 'roots': roots,
                 'lemmas': lemmas,

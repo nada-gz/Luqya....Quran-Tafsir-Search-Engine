@@ -1,10 +1,23 @@
-from fastapi import FastAPI, Query
-from fastapi.middleware.cors import CORSMiddleware
 import meilisearch
 from typing import Optional
+import re
+from fastapi import FastAPI, Query
+from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session
 from database import engine
 from models import Morphology
+
+def normalize_arabic(text):
+    if not text: return ""
+    # Strip Tashkeel
+    tashkeel = re.compile(r'[\u064B-\u065F\u0670]')
+    text = re.sub(tashkeel, '', text)
+    # Normalize Alif
+    text = re.sub(r'[إأآ]', 'ا', text)
+    # Normalize Hamza on Waw/Ya
+    text = re.sub(r'[ؤ]', 'و', text)
+    text = re.sub(r'[ئ]', 'ي', text)
+    return text
 
 app = FastAPI(title="Smart Quran & Tafsir Search Engine", description="Dataset-driven Semantic API")
 
@@ -38,11 +51,11 @@ def search(
     if surah:
         search_params['filter'] = [f'surah_number = {surah}']
         
-    actual_search_query = q
+    actual_search_query = normalize_arabic(q)
     root_explanation = None
     
     if mode == "ayah_only":
-        search_params['attributesToSearchOn'] = ['text_uthmani']
+        search_params['attributesToSearchOn'] = ['text_normalized', 'text_uthmani']
     elif mode == "tafsir_only":
         search_params['attributesToSearchOn'] = [
             'tafsir_simple_moyassar',
@@ -52,10 +65,8 @@ def search(
         ]
     elif mode == "semantic_root":
         # Look up root from the linguistic dataset
-        
-        # Simple Arabic normalizer
-        import re
-        q_norm = re.sub(r'[\u064B-\u065F\u0670]', '', q)
+        q_norm = actual_search_query
+        # Small tweak: remove common Arabic articles for root lookup
         if q_norm.startswith('ال'): q_norm = q_norm[2:]
         if q_norm.startswith('بال'): q_norm = q_norm[3:]
         if q_norm.startswith('وال'): q_norm = q_norm[3:]
@@ -93,7 +104,7 @@ def search(
             explanation.append(root_explanation)
         else:
             for attr in matches.keys():
-                if attr == 'text_uthmani':
+                if attr in ['text_uthmani', 'text_normalized']:
                     explanation.append("keyword found directly in the Ayah text")
                 elif attr.startswith('tafsir_'):
                     clean_name = attr.replace('tafsir_', '').replace('_', ' ').title()
