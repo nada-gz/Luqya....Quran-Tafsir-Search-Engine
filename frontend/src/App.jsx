@@ -4,7 +4,7 @@ import { Search, Moon, Sun, Sparkles, Book, Library, BookOpen } from 'lucide-rea
 import './index.css';
 
 // Integrated Logo Component: Search icon inside the letter 'ق'
-const SearchInLogo = ({ color = "var(--accent-primary)" }) => (
+const SearchInLogo = ({ color = "var(--accent-gold)" }) => (
   <div className="brand-logo-container">
     <span className="brand-name">لُـقـيَـا</span>
     <div className="qaf-search-lens">

@@ -80,7 +80,7 @@ body {
   font-family: 'Vibes', serif;
   font-size: 4rem;
   font-weight: 400;
-  color: var(--accent-primary);
+  color: var(--accent-gold); /* Uses --accent-gold: maroon in light, #E7E5DB in dark */
   line-height: 1;
   letter-spacing: normal !important; /* Spacing handled by kashidas */
   display: block;
