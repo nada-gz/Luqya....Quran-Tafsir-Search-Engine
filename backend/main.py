@@ -113,14 +113,23 @@ def search(
         if root_explanation and mode == "semantic_root":
             explanation.append(root_explanation)
         else:
+            expl_set = set()
             for attr in matches.keys():
                 # ONLY add to explanation if the attribute was part of the intended search mode
                 if attr in searched_attrs:
                     if attr in ['text_uthmani', 'text_normalized']:
-                        explanation.append("keyword found directly in the Ayah text")
+                        expl_set.add("keyword found directly in the Ayah text")
                     elif attr.startswith('tafsir_'):
-                        clean_name = attr.replace('tafsir_', '').replace('_', ' ').title()
-                        explanation.append(f"keyword found in {clean_name} Tafsir")
+                        tafsir_map = {
+                            'moyassar': 'الميسر',
+                            'saadi': 'السعدي',
+                            'katheer': 'ابن كثير',
+                            'tabari': 'الطبري'
+                        }
+                        source = attr.replace('tafsir_simple_', '').replace('tafsir_advanced_', '')
+                        name = tafsir_map.get(source, source.title())
+                        expl_set.add(f"وجد في تفسير {name}")
+            explanation = list(expl_set)
                 
         hit['explanation'] = " | ".join(explanation) if explanation else "matched based on selected focus"
         

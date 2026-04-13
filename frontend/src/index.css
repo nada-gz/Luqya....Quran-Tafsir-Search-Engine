@@ -9,9 +9,9 @@
   
   --accent-primary: #064E3B;
   --accent-secondary: #065F46;
-  --accent-gold: #B45309; /* Rich Burnt Gold */
+  --accent-gold: #C2A385; /* Calm Desert Beige */
   
-  --border-color: #E5E7EB;
+  --border-color: #E2E8F0;
   --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
   --badge-bg: rgba(6, 78, 59, 0.08);
   --badge-text: #064E3B;
@@ -105,26 +105,32 @@ body {
   width: 100%;
   max-width: 800px;
   margin-bottom: 2rem;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.05);
   border-radius: 20px;
-  overflow: hidden;
 }
 
 .search-input {
   width: 100%;
-  padding: 1.5rem 1.5rem 1.5rem 4rem;
+  padding: 1.5rem 1.75rem 1.5rem 4rem;
   font-size: 1.35rem;
   background: var(--bg-secondary);
-  border: 2px solid transparent;
+  border: 1px solid var(--border-color); /* Single crisp border */
+  border-radius: 20px; /* Matching wrapper */
   color: var(--text-primary);
   outline: none;
   transition: all 0.2s ease;
   font-family: 'Amiri', 'Inter', serif;
+  direction: rtl; /* Force cursor to right */
+  text-align: right;
+}
+
+.search-input::placeholder {
+  opacity: 0.5;
 }
 
 .search-input:focus {
   border-color: var(--accent-primary);
-  background: #fff;
+  box-shadow: 0 0 0 3px rgba(6, 78, 59, 0.1);
 }
 
 .search-icon {
@@ -133,7 +139,8 @@ body {
   top: 50%;
   transform: translateY(-50%);
   color: var(--text-secondary);
-  opacity: 0.5;
+  opacity: 0.6;
+  z-index: 1;
 }
 
 .mode-selector {
@@ -174,35 +181,22 @@ body {
 .results-list {
   display: flex;
   flex-direction: column;
-  gap: 2.5rem; /* Large spacing between results */
+  gap: 3.5rem; /* Large spacing between results */
 }
 
 .result-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: 24px;
-  padding: 2rem;
+  padding: 2.5rem;
   box-shadow: var(--card-shadow);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
-  overflow: hidden;
-}
-
-.result-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 4px;
-  height: 100%;
-  background: var(--accent-gold);
-  border-radius: 0 24px 24px 0;
-  opacity: 0.3;
 }
 
 .result-card:hover {
-  transform: scale(1.01);
-  box-shadow: 0 25px 30px -10px rgba(0, 0, 0, 0.08);
+  transform: scale(1.005);
+  box-shadow: 0 30px 40px -15px rgba(0, 0, 0, 0.08);
 }
 
 .badge {
@@ -215,41 +209,60 @@ body {
   border-radius: 10px;
   font-size: 0.85rem;
   font-weight: 700;
-  margin-bottom: 1.5rem;
-  letter-spacing: 0.02em;
+  margin-bottom: 2rem;
+  direction: rtl;
 }
 
 .ayah-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: 2rem;
   border-bottom: 1px solid var(--border-color);
   padding-bottom: 1rem;
-  direction: rtl; /* RTL for headers */
-}
-
-.ayah-reference {
-  font-size: 1rem;
-  font-weight: 800;
-  color: var(--accent-primary);
-  background: var(--bg-tertiary);
-  padding: 0.5rem 1rem;
-  border-radius: 12px;
-}
-
-.arabic-text {
-  font-family: 'Amiri', serif;
   direction: rtl;
-  text-align: right;
-  line-height: 2;
 }
 
 .ayah-text {
-  font-size: 2.25rem;
-  color: var(--text-primary);
-  margin-bottom: 2rem;
+  font-size: 2.15rem;
+  font-weight: 500;
+  color: var(--accent-gold);
+  margin-bottom: 2.5rem;
   padding: 1rem 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 1.25rem;
+  line-height: 1.8;
+}
+
+.ayah-number-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1.5px solid var(--accent-gold);
+  border-radius: 50%;
+  font-size: 1.15rem;
+  font-family: 'Inter', sans-serif;
+  color: var(--accent-gold);
+  margin-left: 0.5rem; /* Space after text in RTL */
+  font-weight: 700;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.ayah-number-circle::after {
+  content: '\06DD'; /* Ayah end symbol decorator */
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0.2;
+  font-size: 3rem;
+  pointer-events: none;
 }
 
 .tafsir-toggles {
@@ -266,7 +279,7 @@ body {
   color: var(--text-secondary);
   padding: 0.6rem 1.25rem;
   border-radius: 10px;
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -278,7 +291,7 @@ body {
 }
 
 .tafsir-btn.active {
-  background: var(--accent-gold);
+  background: var(--accent-secondary); /* Calm Muted Sage */
   color: white;
 }
 
@@ -287,8 +300,10 @@ body {
   border-radius: 18px;
   padding: 1.75rem;
   margin-top: 1.5rem;
-  border-right: 5px solid var(--accent-gold);
+  border-right: 5px solid var(--accent-gold); /* Sage accent */
   animation: slideDown 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  direction: rtl;
+  text-align: right;
 }
 
 .tafsir-title {

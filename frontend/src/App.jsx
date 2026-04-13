@@ -17,15 +17,11 @@ const ResultCard = ({ hit, mode }) => {
   const translateExplanation = (exp) => {
     if (!exp) return "مطابقة";
     if (exp === "keyword found directly in the Ayah text") return "تم العثور في نص الآية";
-    if (exp.includes("Tafsir")) {
-      const parts = exp.split(' ');
-      const name = parts[parts.length - 2]; 
-      return `وجد في تفسير ${name}`;
-    }
-    if (exp.startsWith("Categorized under Linguistic Root:")) {
+    // Backend now provides "وجد في تفسير السعدي" etc. directly
+    if (exp && exp.startsWith("Categorized under Linguistic Root:")) {
       return `مربوط بالجذر: ${exp.split(':').pop().trim()}`;
     }
-    return exp;
+    return exp || "مطابقة";
   };
 
   return (
@@ -36,11 +32,12 @@ const ResultCard = ({ hit, mode }) => {
       </div>
       
       <div className="ayah-header">
-        <span className="ayah-reference">سورة {hit.surah_name} ({hit.surah_number}:{hit.ayah_number})</span>
+        <div className="ayah-reference">سورة {hit.surah_name} ({hit.surah_number}:{hit.ayah_number})</div>
       </div>
       
       <div className="ayah-text arabic-text">
-        {hit.text_uthmani}
+        <span className="ayah-number-circle">{hit.ayah_number}</span>
+        <span>{hit.text_uthmani}</span>
       </div>
 
       <div className="tafsir-toggles">
@@ -62,7 +59,9 @@ const ResultCard = ({ hit, mode }) => {
         <div className="tafsir-container">
           <div className="tafsir-title" dir="rtl">تفسير {tafsirData.find(t => t.id === activeTafsir).name}</div>
           <div className="tafsir-text arabic-text">
-            {hit[`tafsir_${activeTafsir}`]}
+            {hit[`tafsir_${activeTafsir}`].split('.').filter(p => p.trim()).map((para, idx) => (
+              <p key={idx} style={{ marginBottom: '1rem' }}>{para.trim()}.</p>
+            ))}
           </div>
         </div>
       )}
@@ -92,9 +91,9 @@ function App() {
     document.documentElement.setAttribute('data-theme', newTheme);
   };
 
-  // Automatically trigger search when mode changes
+  // Automatically trigger search when mode changes (Recovery bug fixed: added error check)
   useEffect(() => {
-    if (query.trim() && results) {
+    if (query.trim() && (results || error)) {
       handleSearch();
     }
   }, [mode]);
@@ -147,7 +146,7 @@ function App() {
               type="text"
               dir="auto"
               className="search-input"
-              placeholder="ابحث عن آية، كلمة، أو معنى..."
+              placeholder="ابحث عن آية، أو كلمة، أو معنى ..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               autoFocus
@@ -187,7 +186,7 @@ function App() {
       {loading && (
         <div className="loading-state">
           <div className="loading-spinner"><Search size={40} /></div>
-          <p dir="rtl">جاري التدبر في آيات الله...</p>
+          <p dir="rtl">جاري البحث في آيات الله...</p>
         </div>
       )}
 
