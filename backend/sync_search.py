@@ -12,9 +12,9 @@ def normalize_arabic(text):
     # Strip Tashkeel
     tashkeel = re.compile(r'[\u064B-\u065F\u0670]')
     text = re.sub(tashkeel, '', text)
-    # Normalize Alif
-    text = re.sub(r'[إأآ]', 'ا', text)
-    # Normalize Hamza on Waw/Ya
+    # Normalize Alif variants (including Alif Wasla)
+    text = re.sub(r'[إأآٱ]', 'ا', text)
+    # Normalize Hamza variants
     text = re.sub(r'[ؤ]', 'و', text)
     text = re.sub(r'[ئ]', 'ي', text)
     return text
@@ -23,30 +23,35 @@ def sync_database():
     print("Connecting to MeiliSearch...")
     index = client.index('quran')
     
-    # Setup index settings for Arabic search
+    # Setup index settings for strict Arabic search
     index.update_settings({
         'searchableAttributes': [
             'text_normalized',
-            'text_uthmani',
             'roots',
             'lemmas',
+            'text_uthmani',
             'tafsir_simple_moyassar',
             'tafsir_simple_saadi',
             'tafsir_advanced_katheer',
             'tafsir_advanced_tabari'
         ],
+        'typoTolerance': {
+            'minWordSizeForTypos': {
+                'oneTypo': 8,   # Only allow one typo for words >= 8 chars
+                'twoTypos': 12  # Only allow two typos for words >= 12 chars
+            }
+        },
+        'rankingRules': [
+            'exactness', # Prefer exact matches first
+            'words',
+            'attribute',
+            'proximity',
+            'typo'
+        ],
         'filterableAttributes': [
             'surah_number',
             'ayah_number',
             'category'
-        ],
-        'rankingRules': [
-            'words',
-            'typo',
-            'proximity',
-            'attribute',
-            'sort',
-            'exactness'
         ]
     })
     

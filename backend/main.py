@@ -12,9 +12,9 @@ def normalize_arabic(text):
     # Strip Tashkeel
     tashkeel = re.compile(r'[\u064B-\u065F\u0670]')
     text = re.sub(tashkeel, '', text)
-    # Normalize Alif
-    text = re.sub(r'[إأآ]', 'ا', text)
-    # Normalize Hamza on Waw/Ya
+    # Normalize Alif variants (including Alif Wasla)
+    text = re.sub(r'[إأآٱ]', 'ا', text)
+    # Normalize Hamza variants
     text = re.sub(r'[ؤ]', 'و', text)
     text = re.sub(r'[ئ]', 'ي', text)
     return text
@@ -45,7 +45,8 @@ def search(
     
     search_params = {
         'showMatchesPosition': True,
-        'limit': 50
+        'limit': 50,
+        'matchingStrategy': 'all'
     }
     
     if surah:
@@ -100,17 +101,28 @@ def search(
         matches = hit.get('_matchesPosition', {})
         explanation = []
         
-        if root_explanation:
+        # Determine which attributes were searched for based on mode
+        searched_attrs = []
+        if mode == "ayah_only":
+            searched_attrs = ['text_uthmani', 'text_normalized']
+        elif mode == "tafsir_only":
+            searched_attrs = ['tafsir_simple_moyassar', 'tafsir_simple_saadi', 'tafsir_advanced_katheer', 'tafsir_advanced_tabari']
+        elif mode == "semantic_root":
+            searched_attrs = ['roots']
+
+        if root_explanation and mode == "semantic_root":
             explanation.append(root_explanation)
         else:
             for attr in matches.keys():
-                if attr in ['text_uthmani', 'text_normalized']:
-                    explanation.append("keyword found directly in the Ayah text")
-                elif attr.startswith('tafsir_'):
-                    clean_name = attr.replace('tafsir_', '').replace('_', ' ').title()
-                    explanation.append(f"keyword found in {clean_name} Tafsir")
+                # ONLY add to explanation if the attribute was part of the intended search mode
+                if attr in searched_attrs:
+                    if attr in ['text_uthmani', 'text_normalized']:
+                        explanation.append("keyword found directly in the Ayah text")
+                    elif attr.startswith('tafsir_'):
+                        clean_name = attr.replace('tafsir_', '').replace('_', ' ').title()
+                        explanation.append(f"keyword found in {clean_name} Tafsir")
                 
-        hit['explanation'] = " | ".join(explanation) if explanation else "matched globally due to semantic relevance"
+        hit['explanation'] = " | ".join(explanation) if explanation else "matched based on selected focus"
         
         if '_matchesPosition' in hit:
             del hit['_matchesPosition']
