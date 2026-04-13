@@ -32,12 +32,12 @@ const ResultCard = ({ hit, mode }) => {
       </div>
       
       <div className="ayah-header">
-        <div className="ayah-reference">سورة {hit.surah_name} ({hit.surah_number}:{hit.ayah_number})</div>
+        <div className="ayah-reference">{/سور/i.test(hit.surah_name.replace(/[\u064B-\u065F]/g, '')) ? hit.surah_name : `سورة ${hit.surah_name}`} ({hit.surah_number}:{hit.ayah_number})</div>
       </div>
       
-      <div className="ayah-text arabic-text">
+      <div className="ayah-text arabic-text" dir="rtl">
+        {hit.text_uthmani}
         <span className="ayah-number-circle">{hit.ayah_number}</span>
-        <span>{hit.text_uthmani}</span>
       </div>
 
       <div className="tafsir-toggles">
@@ -199,7 +199,7 @@ function App() {
       {results && !loading && (
         <section className="results-area">
           <div className="results-info" dir="rtl">
-            تم العثور على {results.estimatedTotalHits} نتيجة
+            تم العثور على {results.count} نتيجة
             {results.semantic_root_used && (
               <span> • مربوط بالجذر: <strong className="arabic-text" style={{ fontSize: '1.4rem', color: 'var(--accent-gold)' }}>{results.semantic_root_used}</strong></span>
             )}
