@@ -9,15 +9,20 @@ from models import Morphology
 
 def normalize_arabic(text):
     if not text: return ""
-    # Strip Tashkeel
-    tashkeel = re.compile(r'[\u064B-\u065F\u0670]')
-    text = re.sub(tashkeel, '', text)
-    # Normalize Alif variants (including Alif Wasla)
-    text = re.sub(r'[إأآٱ]', 'ا', text)
-    # Normalize Hamza variants
-    text = re.sub(r'[ؤ]', 'و', text)
-    text = re.sub(r'[ئ]', 'ي', text)
-    return text
+    # Replace hamza-above and hamza-below marks with Alif to preserve the sound seat
+    text = re.sub(r'[\u0654\u0655]', 'ا', text)
+    # Strip all Quranic marks, Tashkeel, and punctuation
+    marks = re.compile(r'[\u0610-\u061A\u064B-\u0653\u0656-\u065F\u06D6-\u06ED]')
+    text = re.sub(marks, '', text)
+    # Normalize Alif and hamza variants to a plain Alif
+    text = re.sub(r'[إأآٱءئؤ]', 'ا', text)
+    # Standardize YEH variants
+    text = re.sub(r'[ى]', 'ي', text)
+    # Strip Tatweel
+    text = re.sub(r'[\u0640]', '', text)
+    # Collapse duplicate Alifs
+    text = re.sub(r'ا+', 'ا', text)
+    return text.strip()
 
 app = FastAPI(title="Smart Quran & Tafsir Search Engine", description="Dataset-driven Semantic API")
 
@@ -100,6 +105,7 @@ def search(
     for hit in results.get('hits', []):
         matches = hit.get('_matchesPosition', {})
         explanation = []
+        is_verified_match = False
         
         # Determine which attributes were searched for based on mode
         searched_attrs = []
@@ -112,11 +118,16 @@ def search(
 
         if root_explanation and mode == "semantic_root":
             explanation.append(root_explanation)
+            is_verified_match = True
         else:
             expl_set = set()
-            for attr in matches.keys():
-                # ONLY add to explanation if the attribute was part of the intended search mode
-                if attr in searched_attrs:
+            for attr in searchable_attrs_in_mode(mode):
+                attr_text = hit.get(attr, "")
+                if not attr_text: continue
+                
+                # Strict substring check in normalized text
+                if actual_search_query in normalize_arabic(attr_text):
+                    is_verified_match = True
                     if attr in ['text_uthmani', 'text_normalized']:
                         expl_set.add("keyword found directly in the Ayah text")
                     elif attr.startswith('tafsir_'):
@@ -131,19 +142,25 @@ def search(
                         expl_set.add(f"وجد في تفسير {name}")
             explanation = list(expl_set)
                 
-        hit['explanation'] = " | ".join(explanation) if explanation else "matched based on selected focus"
-        
-        if '_matchesPosition' in hit:
-            del hit['_matchesPosition']
-            
-        processed_hits.append(hit)
+        if is_verified_match:
+            hit['explanation'] = " | ".join(explanation) if explanation else "matched based on selected focus"
+            if '_matchesPosition' in hit:
+                del hit['_matchesPosition']
+            processed_hits.append(hit)
         
     return {
         "query": q,
         "mode": mode,
         "processingTimeMs": results.get('processingTimeMs'),
-        "estimatedTotalHits": results.get('estimatedTotalHits'),
-        "engine": "MeiliSearch",
-        "semantic_root_used": actual_search_query if mode == "semantic_root" else None,
+        "count": len(processed_hits),
         "results": processed_hits
     }
+
+def searchable_attrs_in_mode(mode):
+    if mode == "ayah_only":
+        return ['text_uthmani', 'text_normalized']
+    elif mode == "tafsir_only":
+        return ['tafsir_simple_moyassar', 'tafsir_simple_saadi', 'tafsir_advanced_katheer', 'tafsir_advanced_tabari']
+    elif mode == "semantic_root":
+        return ['roots']
+    return []
