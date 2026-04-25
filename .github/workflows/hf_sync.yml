@@ -1,0 +1,45 @@
+name: Sync to Hugging Face Space
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Push to HF
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          # Configure Git
+          git config --global user.email "bot@github.com"
+          git config --global user.name "Workflow Bot"
+          
+          # Create a temporary deployment directory
+          mkdir -p hf_deploy
+          
+          # Copy only the contents of the backend folder
+          # We exclude venv and caches to keep it small
+          rsync -av --exclude='venv' --exclude='__pycache__' --exclude='.git' backend/ hf_deploy/
+          
+          cd hf_deploy
+          git init
+          git lfs install
+          
+          # Track large files specifically in the new repo
+          git lfs track "*.db"
+          git lfs track "quran.db"
+          
+          # Add the HF Space as the remote
+          git remote add origin https://nadagz:$HF_TOKEN@huggingface.co/spaces/nadagz/luqya
+          
+          # Force push to update the Space
+          git add .
+          git commit -m "Sync from GitHub: ${GITHUB_SHA}"
+          git push --force origin master:main
