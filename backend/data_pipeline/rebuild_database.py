@@ -22,14 +22,39 @@ from sqlalchemy import text
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'quran.db')
 
 def normalize_arabic(text):
-    if not text: return ""
-    text = re.sub(r'[\u0654\u0655]', '\u0627', text)
-    text = re.sub(re.compile(r'[\u0610-\u061A\u064B-\u0653\u0656-\u065F\u06D6-\u06ED]'), '', text)
-    text = re.sub(r'[\u0625\u0623\u0622\u0671\u0621\u0626\u0624]', '\u0627', text)
-    text = re.sub(r'[\u0649]', '\u064a', text)
+    if not text:
+        return ""
+    text = re.sub(r'[\u0654\u0655]', 'ا', text)
+    marks = re.compile(r'[\u0610-\u061A\u064B-\u0653\u0656-\u065F\u06D6-\u06ED]')
+    text = re.sub(marks, '', text)
+    text = re.sub(r'[إأآٱءئؤ]', 'ا', text)
+    text = re.sub(r'[ى]', 'ي', text)
     text = re.sub(r'[\u0640]', '', text)
-    text = re.sub(r'\u0627+', '\u0627', text)
+    
+    # Map dagger alif (\u0670) to normal alif
+    text = re.sub(r'\u0670', 'ا', text)
+    
+    # Standard orthography exceptions
+    text = re.sub(r'\bهاذا\b', 'هذا', text)
+    text = re.sub(r'\bهاذه\b', 'هذه', text)
+    text = re.sub(r'\bذالك\b', 'ذلك', text)
+    text = re.sub(r'\bكذالك\b', 'كذلك', text)
+    text = re.sub(r'\bذالكم\b', 'ذلكم', text)
+    text = re.sub(r'\bرحمان\b', 'رحمن', text)
+    text = re.sub(r'\bالرحمان\b', 'الرحمن', text)
+    text = re.sub(r'\bالاه\b', 'اله', text)
+    text = re.sub(r'\bلاكن\b', 'لكن', text)
+    text = re.sub(r'\bطاها\b', 'طه', text)
+
+    text = re.sub(r'ا+', 'ا', text)
     return text.strip()
+
+def fix_tanween_spacing(text):
+    if not text:
+        return ""
+    # Remove space between tanween and bare Alif ONLY at the end of a word word
+    pattern = r'([\u08F0\u08F1\u08F2\u064B\u064C\u064D]) \u0627(?=[\s\u06D6-\u06ED]|$)'
+    return re.sub(pattern, '\\1\u0627', text)
 
 def fetch_json(url):
     print(f"Fetching: {url}")
@@ -105,7 +130,7 @@ def main():
         for idx, ayah_raw in enumerate(all_ayahs):
             s_num = ayah_raw['chapter']
             a_num = ayah_raw['verse']
-            txt = ayah_raw['text']
+            txt = fix_tanween_spacing(ayah_raw['text'])
             txt_norm = normalize_arabic(txt)
             
             if s_num != current_surah:

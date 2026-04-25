@@ -2,7 +2,9 @@ from sqlmodel import SQLModel, create_engine, Session
 # Ignore the import error below if Pyright complains; models must be imported for SQLModel metadata to recognize them
 import models
 
-sqlite_file_name = "quran.db"
+import os
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sqlite_file_name = os.path.join(_BASE_DIR, "quran.db")
 sqlite_url = f"sqlite:///{sqlite_file_name}"
 
 engine = create_engine(sqlite_url, echo=False)

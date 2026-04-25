@@ -11,19 +11,30 @@ from models import Surah, Ayah, Tafsir
 client = meilisearch.Client('http://127.0.0.1:7700', 'quran_search_master_key')
 
 def normalize_arabic(text):
-    if not text: return ""
-    # Replace hamza-above and hamza-below marks with Alif to preserve the sound seat
+    if not text:
+        return ""
     text = re.sub(r'[\u0654\u0655]', 'ا', text)
-    # Strip all Quranic marks, Tashkeel, and punctuation
     marks = re.compile(r'[\u0610-\u061A\u064B-\u0653\u0656-\u065F\u06D6-\u06ED]')
     text = re.sub(marks, '', text)
-    # Normalize Alif and hamza variants to a plain Alif
     text = re.sub(r'[إأآٱءئؤ]', 'ا', text)
-    # Standardize YEH variants
     text = re.sub(r'[ى]', 'ي', text)
-    # Strip Tatweel
     text = re.sub(r'[\u0640]', '', text)
-    # Collapse duplicate Alifs
+    
+    # Map dagger alif (\u0670) to normal alif
+    text = re.sub(r'\u0670', 'ا', text)
+    
+    # Standard orthography exceptions
+    text = re.sub(r'\bهاذا\b', 'هذا', text)
+    text = re.sub(r'\bهاذه\b', 'هذه', text)
+    text = re.sub(r'\bذالك\b', 'ذلك', text)
+    text = re.sub(r'\bكذالك\b', 'كذلك', text)
+    text = re.sub(r'\bذالكم\b', 'ذلكم', text)
+    text = re.sub(r'\bرحمان\b', 'رحمن', text)
+    text = re.sub(r'\bالرحمان\b', 'الرحمن', text)
+    text = re.sub(r'\bالاه\b', 'اله', text)
+    text = re.sub(r'\bلاكن\b', 'لكن', text)
+    text = re.sub(r'\bطاها\b', 'طه', text)
+
     text = re.sub(r'ا+', 'ا', text)
     return text.strip()
 
