@@ -1,5 +1,9 @@
 # Large data files - ignore databases and Meilisearch data
 *.db
+*.db-journal
+*.db-wal
+*.db-shm
+!backend/quran.db
 *.sqlite
 *.sqlite3
 meili_data/
