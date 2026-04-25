@@ -25,6 +25,22 @@ def normalize_arabic(text):
     text = re.sub(r'[إأآٱءئؤ]', 'ا', text)
     text = re.sub(r'[ى]', 'ي', text)
     text = re.sub(r'[\u0640]', '', text)
+    
+    # Map dagger alif (\u0670) to normal alif
+    text = re.sub(r'\u0670', 'ا', text)
+    
+    # Standard orthography exceptions
+    text = re.sub(r'\bهاذا\b', 'هذا', text)
+    text = re.sub(r'\bهاذه\b', 'هذه', text)
+    text = re.sub(r'\bذالك\b', 'ذلك', text)
+    text = re.sub(r'\bكذالك\b', 'كذلك', text)
+    text = re.sub(r'\bذالكم\b', 'ذلكم', text)
+    text = re.sub(r'\bرحمان\b', 'رحمن', text)
+    text = re.sub(r'\bالرحمان\b', 'الرحمن', text)
+    text = re.sub(r'\bالاه\b', 'اله', text)
+    text = re.sub(r'\bلاكن\b', 'لكن', text)
+    text = re.sub(r'\bطاها\b', 'طه', text)
+
     text = re.sub(r'ا+', 'ا', text)
     return text.strip()
 
@@ -365,11 +381,12 @@ def search(
                     continue
                 text_norm = normalize_arabic(attr_text)
                 if mode == "ayah_only":
-                    pattern = r'(^|\s|[بوثفكل])' + re.escape(q_norm_display) + r'(\s|$)'
+                    pattern = r'(^|\s)' + re.escape(q_norm_display)
                     if re.search(pattern, text_norm):
                         is_verified_match = True
                 else:  # tafsir_only
-                    if q_norm_display in text_norm:
+                    pattern = r'(^|\s)' + re.escape(q_norm_display)
+                    if re.search(pattern, text_norm):
                         is_verified_match = True
                 if is_verified_match:
                     if attr in ('text_uthmani', 'text_normalized'):
