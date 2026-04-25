@@ -1,7 +1,7 @@
 ---
 title: Luqya Backend
 emoji: 📖
-colorFrom: gold
+colorFrom: yellow
 colorTo: indigo
 sdk: docker
 pinned: false
