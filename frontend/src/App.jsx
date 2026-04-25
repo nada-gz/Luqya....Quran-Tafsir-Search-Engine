@@ -16,9 +16,10 @@ const SearchInLogo = ({ color = "var(--accent-gold)" }) => (
   </div>
 );
 
-// ResultCard sub-component with interactive toggles
 const ResultCard = ({ hit, mode }) => {
   const [activeTafsir, setActiveTafsir] = useState(null);
+
+  if (!hit || !hit.surah_name) return null;
 
   const tafsirData = [
     { id: 'simple_moyassar', name: 'الميسر' },
@@ -30,22 +31,33 @@ const ResultCard = ({ hit, mode }) => {
   const translateExplanation = (exp) => {
     if (!exp) return "مطابقة";
     if (exp === "keyword found directly in the Ayah text") return "تم العثور في نص الآية";
-    // Backend now provides "وجد في تفسير السعدي" etc. directly
-    if (exp && exp.startsWith("Categorized under Linguistic Root:")) {
-      return `مربوط بالجذر: ${exp.split(':').pop().trim()}`;
+    if (exp && exp.includes("Thematic Match:")) {
+      return exp.replace("Thematic Match:", "موضوع: ");
+    }
+    if (exp && exp.includes("Linguistic Root:")) {
+      return exp.replace("Linguistic Root:", "جذر لغوي: ");
     }
     return exp || "مطابقة";
   };
 
+  const safeSurahName = hit.surah_name || "سورة";
+  const normalizedSurahName = safeSurahName.replace(/[\u064B-\u065F]/g, '');
+
   return (
     <div className="result-card">
-      <div className="badge">
-        <Sparkles size={14} />
-        <span>{translateExplanation(hit.explanation)}</span>
+      <div className="badge-container">
+        {(hit.explanation || "مطابقة").split(' | ').map((exp, idx) => (
+          <div key={idx} className={`badge ${exp.includes('Thematic') ? 'thematic-badge' : ''}`}>
+            <Sparkles size={14} />
+            <span>{translateExplanation(exp)}</span>
+          </div>
+        ))}
       </div>
       
       <div className="ayah-header">
-        <div className="ayah-reference">{/سور/i.test(hit.surah_name.replace(/[\u064B-\u065F]/g, '')) ? hit.surah_name : `سورة ${hit.surah_name}`} ({hit.surah_number}:{hit.ayah_number})</div>
+        <div className="ayah-reference">
+          {/سور/i.test(normalizedSurahName) ? safeSurahName : `سورة ${safeSurahName}`} ({hit.surah_number}:{hit.ayah_number})
+        </div>
       </div>
       
       <div className="ayah-text arabic-text" dir="rtl">
@@ -122,7 +134,8 @@ function App() {
     // but update when fresh data arrives.
 
     try {
-      const response = await axios.get(`http://127.0.0.1:8000/api/search`, {
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+      const response = await axios.get(`${API_BASE}/api/search`, {
         params: { q: query, mode }
       });
 
@@ -222,6 +235,38 @@ function App() {
               <ResultCard key={hit.id} hit={hit} mode={mode} />
             ))}
           </div>
+          
+          {results.related_themes && results.related_themes.length > 0 && (
+            <div className="related-themes-section" style={{ marginTop: '3rem', borderTop: '2px dashed var(--border)', paddingTop: '2rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: '1.5rem', gap: '0.75rem' }}>
+                <h2 className="arabic-text" dir="rtl" style={{ fontSize: '1.8rem', color: 'var(--text)', margin: 0 }}>مواضيع متعلقة</h2>
+                <BookOpen size={24} style={{ color: 'var(--accent-gold)' }} />
+              </div>
+              
+              <div className="related-themes-list" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                {results.related_themes.map((themeGroup, idx) => (
+                  <div key={idx} className="theme-group" style={{ background: 'var(--surface)', padding: '1.5rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                    <h3 className="arabic-text" dir="rtl" style={{ fontSize: '1.4rem', color: 'var(--accent-gold)', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Library size={18} />
+                      {themeGroup.theme_name}
+                    </h3>
+                    <div className="theme-ayah-list" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      {themeGroup.ayahs.map(hit => (
+                        <div key={hit.id} className="theme-ayah-card" style={{ padding: '1rem', background: 'var(--bg)', borderRadius: '12px' }}>
+                          <p className="arabic-text" dir="rtl" style={{ fontSize: '1.2rem', lineHeight: '2', margin: 0 }}>
+                            {hit.text_uthmani} <span className="ayah-number-circle" style={{ fontSize: '0.8rem', transform: 'scale(0.8)' }}>{hit.ayah_number}</span>
+                          </p>
+                          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.5rem', textAlign: 'right' }}>
+                            {hit.surah_name.includes('سورة') ? hit.surah_name : `سورة ${hit.surah_name}`} ({hit.surah_number}:{hit.ayah_number})
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
       )}
       

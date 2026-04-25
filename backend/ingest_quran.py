@@ -60,6 +60,8 @@ def ingest_all():
     from sqlalchemy import text
     with Session(engine) as db_session:
         # Clear local metadata
+        print("Cleaning up database...")
+        db_session.execute(text("DELETE FROM tafsir"))
         db_session.execute(text("DELETE FROM ayah"))
         db_session.execute(text("DELETE FROM surah"))
         db_session.commit()
@@ -92,7 +94,7 @@ def ingest_all():
         for i, ayah_raw in enumerate(all_ayahs):
             surah_num = ayah_raw['chapter']
             ayah_num = ayah_raw['verse']
-            text = ayah_raw['text']
+            text_val = ayah_raw['text']
             
             # Load new Tafsirs if Surah changed
             if surah_num != current_surah_num:
@@ -108,10 +110,8 @@ def ingest_all():
                             data = resp.json()
                             tafsir_cache[key] = {t['ayah']: t['text'] for t in data.get('ayahs', [])}
                         else:
-                            print(f"  Warning: {key} surah {surah_num} status {resp.status_code}")
                             tafsir_cache[key] = {}
                     except Exception as e:
-                        print(f"  Error fetching {key} for surah {surah_num}: {e}")
                         tafsir_cache[key] = {}
                 current_surah_num = surah_num
             
@@ -119,10 +119,21 @@ def ingest_all():
             new_ayah = Ayah(
                 surah_id=surah_map[surah_num],
                 ayah_number=ayah_num,
-                text_uthmani=text
+                text_uthmani=text_val
             )
             db_session.add(new_ayah)
             db_session.flush() 
+            
+            # Save Tafsirs to SQLite
+            for key in tafsir_slugs.keys():
+                content = tafsir_cache.get(key, {}).get(ayah_num, "")
+                if content:
+                    t_type = f"simple_{key}" if key in ['moyassar', 'saadi'] else f"advanced_{key}"
+                    db_session.add(Tafsir(
+                        ayah_id=new_ayah.id,
+                        tafsir_type=t_type,
+                        text=content
+                    ))
             
             # Prepare Meilisearch Document
             doc = {
@@ -130,8 +141,8 @@ def ingest_all():
                 'surah_number': surah_num,
                 'surah_name': next(s['arabicname'] for s in surah_info['chapters'] if s['chapter'] == surah_num),
                 'ayah_number': ayah_num,
-                'text_uthmani': text,
-                'text_normalized': normalize_arabic(text),
+                'text_uthmani': text_val,
+                'text_normalized': normalize_arabic(text_val),
                 'tafsir_simple_moyassar': tafsir_cache.get('moyassar', {}).get(ayah_num, ""),
                 'tafsir_simple_saadi': tafsir_cache.get('saadi', {}).get(ayah_num, ""),
                 'tafsir_advanced_katheer': tafsir_cache.get('katheer', {}).get(ayah_num, ""),

@@ -2,4 +2,3 @@ fastapi
 uvicorn
 sqlmodel
 requests
-meilisearch
