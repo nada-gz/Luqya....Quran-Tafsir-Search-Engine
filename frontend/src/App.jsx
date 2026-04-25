@@ -134,7 +134,8 @@ function App() {
     // but update when fresh data arrives.
 
     try {
-      const response = await axios.get(`http://127.0.0.1:8000/api/search`, {
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+      const response = await axios.get(`${API_BASE}/api/search`, {
         params: { q: query, mode }
       });
 

@@ -1,71 +1,66 @@
-import meilisearch
-from typing import Optional
+"""
+Luqya | لُقْيَا  — Quranic Search API
+Backed entirely by SQLite FTS5. No Meilisearch required.
+Search modes:
+  ayah_only    — strict word-boundary match in ayah text
+  tafsir_only  — substring match across all four tafsir texts
+  semantic_root — root/taxonomy-driven diversified thematic results
+"""
 import re
+import json
+import os
+import sqlite3
+from typing import Optional
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
-from sqlmodel import Session
-from database import engine
-from models import Morphology
 
+
+# ── Arabic normalization ──────────────────────────────────────────────────────
 def normalize_arabic(text):
-    if not text: return ""
-    # Replace hamza-above and hamza-below marks with Alif to preserve the sound seat
+    if not text:
+        return ""
     text = re.sub(r'[\u0654\u0655]', 'ا', text)
-    # Strip all Quranic marks, Tashkeel, and punctuation
     marks = re.compile(r'[\u0610-\u061A\u064B-\u0653\u0656-\u065F\u06D6-\u06ED]')
     text = re.sub(marks, '', text)
-    # Normalize Alif and hamza variants to a plain Alif
     text = re.sub(r'[إأآٱءئؤ]', 'ا', text)
-    # Standardize YEH variants
     text = re.sub(r'[ى]', 'ي', text)
-    # Strip Tatweel
     text = re.sub(r'[\u0640]', '', text)
-    # Collapse duplicate Alifs
     text = re.sub(r'ا+', 'ا', text)
     return text.strip()
 
-# Load enrichment map for semantic grouping
-import json
-import os
+
+# ── Paths ────────────────────────────────────────────────────────────────────
+_BASE = os.path.dirname(__file__)
+FTS_DB = os.path.join(_BASE, 'quran.db')
+
+# ── Load enrichment map (root → dominant topic + siblings) ───────────────────
 try:
-    with open(os.path.join(os.path.dirname(__file__), 'enrichment_map.json'), 'r') as f:
-        enrichment_map = json.load(f)
-except:
+    with open(os.path.join(_BASE, 'enrichment_map.json'), 'r') as _f:
+        enrichment_map: dict = json.load(_f)
+except Exception:
     enrichment_map = {}
 
-# Pre-build a normalized-word → root dictionary at startup.
-# This maps every normalized text/lemma form in the Quran morphology to its
-# linguistic root, enabling O(1) lookups with no tashkeel mismatch.
+# ── Load pre-computed root lookup (replaces morphology DB table) ──────────────
+# norm_to_root  : normalized word form → linguistic root  (exact, O(1))
+# prefix_to_root: word prefix          → linguistic root  (fallback for masdars)
 norm_to_root: dict = {}
+prefix_to_root: dict = {}
 try:
-    from sqlmodel import Session as _Session
-    from models import Morphology as _Morph
-    from database import engine as _engine
-    with _Session(_engine) as _s:
-        for row in _s.query(_Morph).all():
-            if row.root:
-                nt = normalize_arabic(row.text)
-                nl = normalize_arabic(row.lemma)
-                if nt and nt not in norm_to_root:
-                    norm_to_root[nt] = row.root
-                if nl and nl not in norm_to_root:
-                    norm_to_root[nl] = row.root
-    print(f"[startup] norm_to_root built: {len(norm_to_root)} entries")
-    # Also build a prefix index: word_prefix → root for fuzzy masdar matching
-    # e.g. 'ابتل' → 'بلو' (because 'ابتلي' is in the dict with root بلو)
-    prefix_to_root: dict = {}
-    for word, root_val in norm_to_root.items():
-        for i in range(4, len(word)):
-            pfx = word[:i]
-            if pfx not in prefix_to_root:
-                prefix_to_root[pfx] = root_val
-    print(f"[startup] prefix_to_root built: {len(prefix_to_root)} entries")
+    with open(os.path.join(_BASE, 'root_lookup.json'), 'r') as _f:
+        _rl = json.load(_f)
+        norm_to_root   = _rl.get('norm_to_root', {})
+        prefix_to_root = _rl.get('prefix_to_root', {})
+    print(f"[startup] root_lookup loaded: {len(norm_to_root):,} words, "
+          f"{len(prefix_to_root):,} prefixes")
 except Exception as _e:
-    print(f"[startup] norm_to_root build failed: {_e}")
-    prefix_to_root: dict = {}
+    print(f"[startup] root_lookup.json not found or corrupt: {_e}")
 
-app = FastAPI(title="Smart Quran & Tafsir Search Engine", description="Dataset-driven Semantic API")
 
+# ── FastAPI app ───────────────────────────────────────────────────────────────
+app = FastAPI(
+    title="Luqya | لُقْيَا Quran Search",
+    description="Dataset-driven semantic Quranic search — SQLite FTS5 powered"
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -74,236 +69,344 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-search_client = meilisearch.Client('http://127.0.0.1:7700', 'quran_search_master_key')
+
+# ── SQLite helpers ────────────────────────────────────────────────────────────
+
+# The SELECT clause used by every search path — joins ayah_meta with the
+# existing tafsir table (4 correlated sub-selects, fast with the covering index
+# created by setup_fts.py).
+_FULL_SELECT = """
+    SELECT
+        m.id,
+        m.surah_number,
+        m.surah_name,
+        m.ayah_number,
+        m.text_uthmani,
+        m.text_normalized,
+        m.roots_text,
+        m.lemmas_text,
+        m.themes_text,
+        (SELECT text FROM tafsir WHERE ayah_id = m.id AND tafsir_type = 'simple_moyassar'  LIMIT 1) AS tafsir_simple_moyassar,
+        (SELECT text FROM tafsir WHERE ayah_id = m.id AND tafsir_type = 'simple_saadi'     LIMIT 1) AS tafsir_simple_saadi,
+        (SELECT text FROM tafsir WHERE ayah_id = m.id AND tafsir_type = 'advanced_katheer' LIMIT 1) AS tafsir_advanced_katheer,
+        (SELECT text FROM tafsir WHERE ayah_id = m.id AND tafsir_type = 'advanced_tabari'  LIMIT 1) AS tafsir_advanced_tabari
+"""
+
+
+def _conn() -> sqlite3.Connection:
+    c = sqlite3.connect(FTS_DB)
+    c.row_factory = sqlite3.Row
+    return c
+
+
+def _row_to_hit(row) -> dict:
+    """Convert a sqlite3.Row to a dict that matches the old Meilisearch hit shape."""
+    d = dict(row)
+    themes_text = d.pop('themes_text', '') or ''
+    d['themes'] = [t.strip() for t in themes_text.split(' | ') if t.strip()]
+    d['roots']  = (d.pop('roots_text',  '') or '').split()
+    d['lemmas'] = (d.pop('lemmas_text', '') or '').split()
+    return d
+
+
+def fts_search(query: str, cols: list, limit: int = 200, surah: int = None) -> list:
+    """
+    Full-text search via SQLite FTS5 (ayah text + themes only).
+    cols — list of FTS5 column names to restrict search to.
+    Returns a list of hit dicts identical in shape to the old Meilisearch hits.
+    """
+    safe_q = (query or '').strip().replace('"', '""')
+    if not safe_q:
+        return []
+
+    col_spec = ('{' + ' '.join(cols) + '}') if len(cols) > 1 else cols[0]
+    fts_expr = f'{col_spec}: "{safe_q}"'
+
+    params: list = [fts_expr]
+    surah_clause = ''
+    if surah:
+        surah_clause = 'AND m.surah_number = ?'
+        params.append(surah)
+    params.append(limit)
+
+    sql = f"""
+        {_FULL_SELECT}
+        FROM ayah_fts f
+        JOIN ayah_meta m ON f.rowid = m.id
+        WHERE ayah_fts MATCH ?
+        {surah_clause}
+        ORDER BY rank
+        LIMIT ?
+    """
+    conn = _conn()
+    try:
+        rows = conn.execute(sql, params).fetchall()
+    except Exception as e:
+        print(f"[fts_search] error: {e}  expr: {fts_expr}")
+        rows = []
+    finally:
+        conn.close()
+    return [_row_to_hit(r) for r in rows]
+
+
+def text_search(query: str, cols: list, limit: int = 200, surah: int = None) -> list:
+    """
+    Substring search for explicit text matching (ayah or tafsir).
+    Uses LIKE on the specified columns.
+    """
+    safe_q = (query or '').strip()
+    if not safe_q:
+        return []
+
+    like_val = f'%{safe_q}%'
+    params: list = []
+    
+    # Build OR clauses for each column
+    or_clauses = [f"{c} LIKE ?" for c in cols]
+    params.extend([like_val] * len(cols))
+    
+    where_sql = " OR ".join(or_clauses)
+    if surah:
+        where_sql = f"({where_sql}) AND m.surah_number = ?"
+        params.append(surah)
+    else:
+        where_sql = f"({where_sql})"
+
+    params.append(limit)
+
+    # Note: tafsir_ columns are handled by joining the tafsir table
+    if any(c.startswith('tafsir_') for c in cols):
+        sql = f"""
+            {_FULL_SELECT}
+            FROM (
+                SELECT DISTINCT ayah_id FROM tafsir WHERE text LIKE ?
+            ) t_match
+            JOIN ayah_meta m ON m.id = t_match.ayah_id
+            WHERE {"m.surah_number = ?" if surah else "1=1"}
+            ORDER BY m.surah_number, m.ayah_number
+            LIMIT ?
+        """
+        # Overwrite params for tafsir since the logic is simpler
+        params = [like_val]
+        if surah:
+            params.append(surah)
+        params.append(limit)
+    else:
+        sql = f"""
+            {_FULL_SELECT}
+            FROM ayah_meta m
+            WHERE {where_sql}
+            ORDER BY m.surah_number, m.ayah_number
+            LIMIT ?
+        """
+
+    conn = _conn()
+    try:
+        rows = conn.execute(sql, params).fetchall()
+    except Exception as e:
+        print(f"[text_search] error: {e}")
+        rows = []
+    finally:
+        conn.close()
+    return [_row_to_hit(r) for r in rows]
+
+def tafsir_search(query: str, limit: int = 200, surah: int = None) -> list:
+    return text_search(query, ['tafsir_mock'], limit, surah)
+
+
+def searchable_attrs_in_mode(mode: str) -> list:
+    if mode == "ayah_only":
+        return ['text_uthmani', 'text_normalized']
+    if mode == "tafsir_only":
+        return ['tafsir_simple_moyassar', 'tafsir_simple_saadi',
+                'tafsir_advanced_katheer', 'tafsir_advanced_tabari']
+    if mode == "semantic_root":
+        return ['roots', 'themes', 'lemmas']
+    return []
+
+
+# ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @app.get("/")
 def read_root():
-    return {"status": "active", "engine": "MeiliSearch + Quranic Corpus"}
+    return {"status": "active", "engine": "SQLite FTS5 + Quranic Corpus"}
+
 
 @app.get("/api/search")
 def search(
-    q: str = Query(..., description="The search query"), 
-    mode: str = Query("ayah_only", description="Mode: ayah_only, tafsir_only, semantic_root"),
-    surah: Optional[int] = None):
-    
-    index = search_client.index('quran')
-    
-    search_params = {
-        'showMatchesPosition': True,
-        'limit': 50,
-        'matchingStrategy': 'all'
-    }
-    
-    if surah:
-        search_params['filter'] = [f'surah_number = {surah}']
-        
+    q: str = Query(..., description="The search query"),
+    mode: str = Query("ayah_only", description="ayah_only | tafsir_only | semantic_root"),
+    surah: Optional[int] = None,
+):
     actual_search_query = normalize_arabic(q)
-    root_explanation = None
-    related_themes_payload = []
-    
-    if mode == "ayah_only":
-        search_params['attributesToSearchOn'] = ['text_normalized', 'text_uthmani']
-        # For ayah_only, we want strict matching
-        search_params['matchingStrategy'] = 'all'
-    elif mode == "tafsir_only":
-        search_params['attributesToSearchOn'] = [
-            'tafsir_simple_moyassar',
-            'tafsir_simple_saadi',
-            'tafsir_advanced_katheer',
-            'tafsir_advanced_tabari'
-        ]
-        search_params['matchingStrategy'] = 'all'
-    elif mode == "semantic_root":
+    root_explanation: Optional[str] = None
+    related_themes_payload: list = []
+
+    # ── Semantic root mode ────────────────────────────────────────────────────
+    if mode == "semantic_root":
         q_norm = actual_search_query
-        # Strip common Arabic prefixes to get to the root concept
+        # Strip common Arabic definite-article / preposition prefixes
         for prefix in ['ال', 'بال', 'وال', 'فال', 'كال', 'لل']:
             if q_norm.startswith(prefix):
                 q_norm = q_norm[len(prefix):]
                 break
-        
-        with Session(engine) as session:
-            try:
-                # O(1) normalized-word → root lookup using the precomputed dict.
-                # No SQL needed, no tashkeel mismatch, no false-positives.
-                root = norm_to_root.get(q_norm)
-                # Fuzzy fallback: if exact form not found (e.g. user typed masdar
-                # 'ابتلاء'→'ابتلا' which isn't in Quran text), try prefix match.
-                if not root and len(q_norm) >= 4:
-                    root = prefix_to_root.get(q_norm[:-1])  # strip last char
-                if not root and len(q_norm) >= 5:
-                    root = prefix_to_root.get(q_norm[:-2])  # strip last 2 chars
-                
-                if root:
-                    root_explanation = f"Linguistic Root: {root}"
-                    
-                    if root in enrichment_map:
-                        root_data = enrichment_map[root]
-                        dom_theme = root_data.get('dominant_topic', '')
-                        if dom_theme:
-                            root_explanation += f" → {dom_theme}"
-                        
-                        # FIX 2: DIVERSIFIED RESULTS — collect up to 10 ayahs per
-                        # topic across all themes (dominant + siblings), merge &
-                        # deduplicate, instead of overwriting the query with one
-                        # topic that floods all 50 result slots.
-                        all_topics = []
-                        if dom_theme:
-                            dom_ar = dom_theme.split('(')[0].strip() if '(' in dom_theme else dom_theme
-                            all_topics.append({'name': dom_theme, 'ar': dom_ar, 'is_dominant': True})
-                        for rtheme in root_data.get('related_themes', []):
-                            rname = rtheme['name']
-                            rar = rname.split('(')[0].strip() if '(' in rname else rname
-                            all_topics.append({'name': rname, 'ar': rar, 'is_dominant': False})
-                        
-                        LIMIT_PER_TOPIC = 10
-                        seen_ids = set()
-                        diversified_hits = []
-                        
-                        for topic in all_topics:
-                            sub_res = index.search(topic['ar'], {
-                                'attributesToSearchOn': ['themes'],
-                                'limit': LIMIT_PER_TOPIC,
-                                'matchingStrategy': 'all'
-                            })
-                            for hit in sub_res.get('hits', []):
-                                if hit['id'] not in seen_ids:
-                                    seen_ids.add(hit['id'])
-                                    hit['_matched_topic'] = topic['name']
-                                    diversified_hits.append(hit)
-                        
-                        # The first topic section is the direct/dominant result,
-                        # the rest go into the related themes sidebar
-                        if all_topics:
-                            dom_topic_name = all_topics[0]['name']
-                            direct_hits = [h for h in diversified_hits if h.get('_matched_topic') == dom_topic_name]
-                            sidebar_topics_seen = {}
-                            for h in diversified_hits:
-                                t = h.get('_matched_topic', '')
-                                if t != dom_topic_name:
-                                    sidebar_topics_seen.setdefault(t, []).append(h)
-                            
-                            for tname, hits in sidebar_topics_seen.items():
-                                related_themes_payload.append({
-                                    "theme_name": tname,
-                                    "ayahs": hits
-                                })
-                            
-                            # Use diversified hits as the actual_search_query
-                            # replacement — we'll bypass the MeiliSearch call below
-                            # by pre-populating processed_hits directly.
-                            for hit in direct_hits[:50]:
-                                hit['explanation'] = root_explanation or "مطابقة دلالية"
-                                hit.pop('_matchesPosition', None)
-                                hit.pop('_matched_topic', None)
-                            
-                            return {
-                                "query": q,
-                                "mode": mode,
-                                "processingTimeMs": 0,
-                                "count": len(direct_hits),
-                                "results": direct_hits[:50],
-                                "related_themes": related_themes_payload
-                            }
-                
-                # Fallback: no root found — do a broad thematic text search
-                search_params['attributesToSearchOn'] = ['themes', 'text_normalized']
-                search_params['matchingStrategy'] = 'last'
-            except Exception as e:
-                return {"error": True, "message": str(e)}
 
-    # Perform the search
-    results = index.search(actual_search_query, search_params)
-    
-    processed_hits = []
-    
-    for hit in results.get('hits', []):
-        explanation = []
+        try:
+            # O(1) exact lookup; fallback to prefix strip for masdar forms
+            # (e.g. 'ابتلاء'→'ابتلا' not in dict, but prefix 'ابتل' points to بلو)
+            root = norm_to_root.get(q_norm)
+            if not root and len(q_norm) >= 4:
+                root = prefix_to_root.get(q_norm[:-1])
+            if not root and len(q_norm) >= 5:
+                root = prefix_to_root.get(q_norm[:-2])
+
+            if root and root in enrichment_map:
+                root_data = enrichment_map[root]
+                dom_theme = root_data.get('dominant_topic', '')
+                root_explanation = f"Linguistic Root: {root}"
+                if dom_theme:
+                    root_explanation += f" \u2192 {dom_theme}"
+
+                # Collect dominant topic + all sibling topics
+                all_topics: list = []
+                if dom_theme:
+                    dom_ar = dom_theme.split('(')[0].strip() if '(' in dom_theme else dom_theme
+                    all_topics.append({'name': dom_theme, 'ar': dom_ar})
+                for rtheme in root_data.get('related_themes', []):
+                    rname = rtheme['name']
+                    rar = rname.split('(')[0].strip() if '(' in rname else rname
+                    all_topics.append({'name': rname, 'ar': rar})
+
+                # Fetch up to 10 ayahs per topic, deduplicate across topics
+                LIMIT_PER_TOPIC = 10
+                seen_ids: set = set()
+                diversified_hits: list = []
+
+                for topic in all_topics:
+                    sub_hits = fts_search(topic['ar'], ['themes_text'], limit=LIMIT_PER_TOPIC)
+                    for hit in sub_hits:
+                        if hit['id'] not in seen_ids:
+                            seen_ids.add(hit['id'])
+                            hit['_matched_topic'] = topic['name']
+                            diversified_hits.append(hit)
+
+                if all_topics:
+                    dom_topic_name = all_topics[0]['name']
+                    direct_hits = [h for h in diversified_hits
+                                   if h.get('_matched_topic') == dom_topic_name]
+                    sidebar: dict = {}
+                    for h in diversified_hits:
+                        t = h.get('_matched_topic', '')
+                        if t != dom_topic_name:
+                            sidebar.setdefault(t, []).append(h)
+
+                    for tname, hits in sidebar.items():
+                        related_themes_payload.append({"theme_name": tname, "ayahs": hits})
+
+                    for hit in direct_hits[:50]:
+                        hit['explanation'] = root_explanation or "مطابقة دلالية"
+                        hit.pop('_matchesPosition', None)
+                        hit.pop('_matched_topic', None)
+
+                    return {
+                        "query": q,
+                        "mode": mode,
+                        "processingTimeMs": 0,
+                        "count": len(direct_hits),
+                        "results": direct_hits[:50],
+                        "related_themes": related_themes_payload,
+                    }
+
+            # Fallback: no root found → broad themes + ayah text search
+            raw_hits = fts_search(actual_search_query, ['themes_text', 'text_normalized'],
+                                  limit=200, surah=surah)
+
+        except Exception as e:
+            return {"error": True, "message": str(e)}
+
+    # ── Ayah-only mode ────────────────────────────────────────────────────────
+    elif mode == "ayah_only":
+        raw_hits = text_search(actual_search_query, ['text_normalized', 'text_uthmani'],
+                               limit=200, surah=surah)
+
+    # ── Tafsir-only mode ──────────────────────────────────────────────────────
+    elif mode == "tafsir_only":
+        raw_hits = tafsir_search(actual_search_query, limit=200, surah=surah)
+
+    else:
+        raw_hits = []
+
+    # ── Post-process: verify matches + build explanation strings ──────────────
+    processed_hits: list = []
+    q_norm_display = normalize_arabic(q)
+
+    for hit in raw_hits:
+        explanation: list = []
         is_verified_match = False
-        
+
         if mode == "semantic_root":
-            # Semantic mode accepts Meilisearch results directly
+            # Fallback path — accept FTS5 results as-is
             is_verified_match = True
-            if root_explanation: explanation.append(root_explanation)
-            
-            # Find which themes matched
+            if root_explanation:
+                explanation.append(root_explanation)
             found_themes = []
             for theme in hit.get('themes', []):
-                # Check for match in theme name
                 theme_norm = normalize_arabic(theme)
-                if normalize_arabic(q) in theme_norm or any(s in theme_norm for s in actual_search_query.split()):
+                if (q_norm_display in theme_norm or
+                        any(s in theme_norm for s in actual_search_query.split())):
                     found_themes.append(theme.split('|')[-1].strip())
-            
             if found_themes:
                 explanation.append(f"Thematic Match: {', '.join(list(set(found_themes))[:2])}")
         else:
-            # STRICT match for ayah_only and tafsir_only as requested
-            q_norm = normalize_arabic(q)
-            expl_set = set()
+            expl_set: set = set()
             for attr in searchable_attrs_in_mode(mode):
-                attr_text = hit.get(attr, "")
-                if not attr_text: continue
-                
-                # STRICT match: Require word boundaries for ayah_only
+                attr_text = hit.get(attr, '') or ''
+                if not attr_text:
+                    continue
                 text_norm = normalize_arabic(attr_text)
                 if mode == "ayah_only":
-                    # Use boundary markers to ensure exact word match
-                    pattern = r'(^|\s)' + re.escape(q_norm) + r'(\s|$)'
+                    pattern = r'(^|\s|[بوثفكل])' + re.escape(q_norm_display) + r'(\s|$)'
                     if re.search(pattern, text_norm):
                         is_verified_match = True
-                else:
-                    # Substring match for tafsir is generally preferred but can be tuned
-                    if q_norm in text_norm:
+                else:  # tafsir_only
+                    if q_norm_display in text_norm:
                         is_verified_match = True
-                
                 if is_verified_match:
-                    if attr in ['text_uthmani', 'text_normalized']:
+                    if attr in ('text_uthmani', 'text_normalized'):
                         expl_set.add("تم العثور في نص الآية")
                     elif attr.startswith('tafsir_'):
                         tafsir_map = {
-                            'moyassar': 'الميسر',
-                            'saadi': 'السعدي',
-                            'katheer': 'ابن كثير',
-                            'tabari': 'الطبري'
+                            'moyassar': 'الميسر', 'saadi': 'السعدي',
+                            'katheer': 'ابن كثير', 'tabari': 'الطبري',
                         }
-                        source = attr.replace('tafsir_simple_', '').replace('tafsir_advanced_', '')
-                        name = tafsir_map.get(source, source.title())
-                        expl_set.add(f"وجد في تفسير {name}")
+                        src = attr.replace('tafsir_simple_', '').replace('tafsir_advanced_', '')
+                        expl_set.add(f"وجد في تفسير {tafsir_map.get(src, src.title())}")
             explanation = list(expl_set)
-                
+
         if is_verified_match:
-            hit['explanation'] = " | ".join(explanation) if explanation else ("مطابقة عامة" if mode=="semantic_root" else "مطابقة مباشرة")
-            if '_matchesPosition' in hit: del hit['_matchesPosition']
+            hit['explanation'] = (" | ".join(explanation) if explanation
+                                  else ("مطابقة عامة" if mode == "semantic_root"
+                                        else "مطابقة مباشرة"))
+            hit.pop('_matchesPosition', None)
             processed_hits.append(hit)
 
-    # Custom Sorting for Option 1 (ayah_only) as requested
+    # ── Custom sorting ────────────────────────────────────────────────────────
     if mode == "ayah_only":
-        q_norm = normalize_arabic(q)
-        starts_with, contains = [], []
-        for h in processed_hits:
-            if h.get('text_normalized', "").startswith(q_norm):
-                starts_with.append(h)
-            else:
-                contains.append(h)
-        starts_with.sort(key=lambda x: (x.get('surah_number', 0), x.get('ayah_number', 0)))
-        contains.sort(key=lambda x: (x.get('surah_number', 0), x.get('ayah_number', 0)))
-        processed_hits = starts_with + contains
+        starts = [h for h in processed_hits
+                  if h.get('text_normalized', '').startswith(q_norm_display)]
+        rest   = [h for h in processed_hits
+                  if not h.get('text_normalized', '').startswith(q_norm_display)]
+        starts.sort(key=lambda x: (x.get('surah_number', 0), x.get('ayah_number', 0)))
+        rest.sort(  key=lambda x: (x.get('surah_number', 0), x.get('ayah_number', 0)))
+        processed_hits = starts + rest
     elif mode == "tafsir_only":
         processed_hits.sort(key=lambda x: (x.get('surah_number', 0), x.get('ayah_number', 0)))
-        
+
     return {
         "query": q,
         "mode": mode,
-        "processingTimeMs": results.get('processingTimeMs'),
+        "processingTimeMs": 0,
         "count": len(processed_hits),
-        "results": processed_hits,
-        "related_themes": related_themes_payload
+        "results": processed_hits[:50],
+        "related_themes": related_themes_payload,
     }
-
-def searchable_attrs_in_mode(mode):
-    if mode == "ayah_only":
-        return ['text_uthmani', 'text_normalized']
-    elif mode == "tafsir_only":
-        return ['tafsir_simple_moyassar', 'tafsir_simple_saadi', 'tafsir_advanced_katheer', 'tafsir_advanced_tabari']
-    elif mode == "semantic_root":
-        return ['roots', 'themes', 'lemmas']
-    return []
