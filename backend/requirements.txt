@@ -2,3 +2,5 @@ fastapi
 uvicorn
 sqlmodel
 requests
+gunicorn
+python-multipart
