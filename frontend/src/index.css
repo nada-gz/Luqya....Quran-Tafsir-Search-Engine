@@ -51,10 +51,13 @@
   padding: 0;
 }
 
-body {
+html, body {
   margin: 0;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden; /* Prevents the "shifting to left" issue */
+  width: 100%;
+  position: relative;
 }
 
 .app-container {
@@ -370,4 +373,16 @@ body {
   text-align: center;
   padding: 6rem 2rem;
   color: var(--text-secondary);
+}
+
+.empty-state-logo-wrapper {
+  opacity: 0.05;
+  margin: 0 auto 2.5rem;
+  display: flex;
+  justify-content: center;
+}
+
+.empty-state-logo-wrapper .brand-logo-img {
+  height: 12rem; /* Large but safe logo in the background */
+  width: auto;
 }

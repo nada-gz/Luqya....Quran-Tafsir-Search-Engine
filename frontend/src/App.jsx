@@ -270,7 +270,7 @@ function App() {
       
       {!results && !loading && !error && (
         <div className="empty-state">
-          <div style={{ opacity: 0.1, margin: '0 auto 2.5rem', display: 'flex', justifyContent: 'center', transform: 'scale(2.5)' }}>
+          <div className="empty-state-logo-wrapper">
             <SearchInLogo />
           </div>
           <p className="arabic-text" style={{ fontSize: '1.5rem' }}>أَفَلَا يَتَدَبَّرُونَ الْقُرْآنَ أَمْ عَلَىٰ قُلُوبٍ أَقْفَالُهَا</p>
