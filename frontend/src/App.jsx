@@ -179,14 +179,14 @@ function App() {
           </div>
           
           <div className="mode-selector">
-            {/* LTR order in DOM: Semantic (Leftmost), Tafsir (Mid), Ayah (Rightmost) */}
+            {/* New order: Ayah (Top/First), Tafsir (Middle), Semantic (Bottom/Last) */}
             <button 
               type="button" 
-              className={`mode-btn ${mode === 'semantic_root' ? 'active' : ''}`}
-              onClick={() => setMode('semantic_root')}
+              className={`mode-btn ${mode === 'ayah_only' ? 'active' : ''}`}
+              onClick={() => setMode('ayah_only')}
             >
-              <Sparkles size={18} />
-              <span>البحث بالمعاني والمقاصد</span>
+              <Book size={18} />
+              <span>ابحث في آيات القرآن</span>
             </button>
             <button 
               type="button" 
@@ -198,11 +198,11 @@ function App() {
             </button>
             <button 
               type="button" 
-              className={`mode-btn ${mode === 'ayah_only' ? 'active' : ''}`}
-              onClick={() => setMode('ayah_only')}
+              className={`mode-btn ${mode === 'semantic_root' ? 'active' : ''}`}
+              onClick={() => setMode('semantic_root')}
             >
-              <Book size={18} />
-              <span>ابحث في آيات القرآن</span>
+              <Sparkles size={18} />
+              <span>البحث بالمعاني والمقاصد</span>
             </button>
           </div>
         </form>
