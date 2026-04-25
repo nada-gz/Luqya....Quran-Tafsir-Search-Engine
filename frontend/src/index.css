@@ -70,35 +70,26 @@ body {
 }
 
 .brand-logo-container {
-  position: relative;
   display: flex;
   align-items: center;
-  gap: 0;
+  justify-content: flex-end;
 }
 
-.brand-name {
-  font-family: 'Vibes', serif;
-  font-size: 4rem;
-  font-weight: 400;
-  color: var(--accent-gold); /* Uses --accent-gold: maroon in light, #E7E5DB in dark */
-  line-height: 1;
-  letter-spacing: normal !important; /* Spacing handled by kashidas */
-  display: block;
+.brand-logo-img {
+  height: 5rem; /* Large and clear logo */
+  width: auto;
+  object-fit: contain;
+  transition: transform 0.3s ease;
 }
 
-.qaf-search-lens {
-  position: absolute;
-  top: 1.3rem;
-  /* Move further left to hit the 'ق' loop in Vibes font */
-  right: 0.85rem; 
-  transform: translateY(-8%);
-  pointer-events: none;
-  opacity: 0.9;
+.brand-logo-img:hover {
+  transform: scale(1.05);
 }
 
-.qaf-search-lens svg {
-  width: 22px;
-  height: 22px;
+@media (max-width: 600px) {
+  .brand-logo-img {
+    height: 3.5rem; /* Slightly smaller on mobile */
+  }
 }
 
 .theme-toggle {

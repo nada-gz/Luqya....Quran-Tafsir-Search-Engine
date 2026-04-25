@@ -3,16 +3,14 @@ import axios from 'axios';
 import { Search, Moon, Sun, Sparkles, Book, Library, BookOpen } from 'lucide-react';
 import './index.css';
 
-// Integrated Logo Component: Search icon inside the letter 'ق'
-const SearchInLogo = ({ color = "var(--accent-gold)" }) => (
+// Logo Component using the provided image asset
+const SearchInLogo = () => (
   <div className="brand-logo-container">
-    <span className="brand-name">لُـقـيَـا</span>
-    <div className="qaf-search-lens">
-      <svg width="24" height="24" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="45" cy="45" r="35" stroke={color} strokeWidth="8" />
-        <path d="M70 70L85 85" stroke={color} strokeWidth="10" strokeLinecap="round" />
-      </svg>
-    </div>
+    <img 
+      src="/luqya with bgg.png" 
+      alt="لُقْيَا" 
+      className="brand-logo-img" 
+    />
   </div>
 );
 
