@@ -13,33 +13,30 @@ jobs:
           fetch-depth: 0
           lfs: true
 
+      - name: Install Git LFS
+        run: git lfs install
+
       - name: Push to HF
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          # Configure Git
           git config --global user.email "bot@github.com"
           git config --global user.name "Workflow Bot"
           
-          # Create a temporary deployment directory
-          mkdir -p hf_deploy
+          # Clone the HF Space into a temporary folder
+          git clone https://nadagz:$HF_TOKEN@huggingface.co/spaces/nadagz/luqya hf_space
           
-          # Copy only the contents of the backend folder
-          # We exclude venv and caches to keep it small
-          rsync -av --exclude='venv' --exclude='__pycache__' --exclude='.git' backend/ hf_deploy/
+          # Copy everything from backend to hf_space
+          # We use rsync to cleanly mirror the folder
+          rsync -av --delete --exclude='.git' backend/ hf_space/
           
-          cd hf_deploy
-          git init
-          git lfs install
-          
-          # Track large files specifically in the new repo
-          git lfs track "*.db"
-          git lfs track "quran.db"
-          
-          # Add the HF Space as the remote
-          git remote add origin https://nadagz:$HF_TOKEN@huggingface.co/spaces/nadagz/luqya
-          
-          # Force push to update the Space
+          cd hf_space
           git add .
-          git commit -m "Sync from GitHub: ${GITHUB_SHA}"
-          git push --force origin master:main
+          
+          # Only commit and push if there are changes
+          if [ -n "$(git status --porcelain)" ]; then
+            git commit -m "Sync from GitHub: ${GITHUB_SHA}"
+            git push origin main
+          else
+            echo "No changes to sync"
+          fi
