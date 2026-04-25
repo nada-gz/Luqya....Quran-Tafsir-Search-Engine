@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400;1,700&family=Scheherazade+New:wght@400;500;600;700&display=swap');
+
 :root {
   /* Persian Heritage Palette: Rich Garnets, Espresso Browns, and Parchment */
   --bg-primary: #FDF8F1; /* Warm Parchment */
@@ -24,6 +26,8 @@
 .arabic-text {
   font-family: 'Scheherazade New', 'Amiri', serif;
   line-height: 2;
+  font-feature-settings: "kern" 1, "liga" 1, "clig" 1;
+  text-rendering: optimizeLegibility;
 }
 
 [data-theme='dark'] {
