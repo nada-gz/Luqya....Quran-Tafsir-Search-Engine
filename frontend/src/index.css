@@ -1,0 +1,447 @@
+:root {
+  /* Persian Heritage Palette: Rich Garnets, Espresso Browns, and Parchment */
+  --bg-primary: #FDF8F1; /* Warm Parchment */
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #F7EFE5;
+  --text-primary: #271B12; /* Espresso Brown */
+  --text-secondary: #5E4D42; /* Coffee Brown */
+  --text-accent: #8B1E1E; /* Persian Garnet Red */
+  
+  --accent-primary: #8B1E1E; /* Red Accent */
+  --accent-secondary: #8B1E1E; 
+  --accent-gold: #8B1E1E;
+  
+  --border-color: #E7D8C9; /* Warm Sand */
+  --card-shadow: 0 10px 25px -5px rgba(39, 27, 18, 0.08), 0 8px 10px -6px rgba(39, 27, 18, 0.08);
+  --badge-bg: rgba(139, 30, 30, 0.08); /* Faint red tint */
+  --badge-text: #8B1E1E;
+  
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+}
+
+.arabic-text {
+  /* Forcing absolute font consistency */
+  font-family: 'Scheherazade New', 'Amiri', serif !important;
+  line-height: 2;
+  direction: rtl;
+  text-align: right;
+  
+  /* Smooth but thin rendering across all browsers */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  
+  /* Forcing ligatures (letter joining) across all browsers */
+  font-variant-ligatures: common-ligatures contextual;
+  font-feature-settings: "kern" 1, "liga" 1, "clig" 1, "calt" 1;
+}
+
+[data-theme='dark'] {
+  --bg-primary: #191A1E; /* Dark slate */
+  --bg-secondary: #212329;
+  --bg-tertiary: #2A2D35;
+  --text-primary: #E7E5DB; /* Warm off-white */
+  --text-secondary: #CBC2B7; /* Warm grey */
+  --text-accent: #E7E5DB; /* Keep text readable */
+  --accent-gold: #E7E5DB;
+  --accent-primary: #49110B; /* Deep Persian Maroon */
+  --border-color: #2A2D35;
+  --card-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  --badge-bg: #49110B; /* Rich maroon background for badges */
+  --badge-text: #E7E5DB;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  margin: 0;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%; /* Prevents breaking Arabic joining on iPhones */
+  overflow-x: hidden;
+  width: 100%;
+  position: relative;
+}
+
+.app-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem;
+  /* NO GLOBAL RTL - Standard LTR wrapper */
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4rem;
+  /* Swapped in DOM: Toggle (Left), Brand (Right) */
+}
+
+.brand-logo-container {
+  display: flex;
+  align-items: center;
+}
+
+.brand-logo-desktop {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.brand-name {
+  font-family: 'Vibes', serif;
+  font-size: 4rem;
+  font-weight: 400;
+  color: var(--accent-gold);
+  line-height: 1;
+  display: block;
+}
+
+.qaf-search-lens {
+  position: absolute;
+  top: 1.3rem;
+  right: 0.85rem; 
+  transform: translateY(-8%);
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+.brand-logo-mobile {
+  display: none;
+  height: 3.5rem;
+  width: auto;
+  object-fit: contain;
+}
+
+@media (max-width: 600px) {
+  .brand-logo-desktop {
+    display: none;
+  }
+  .brand-logo-mobile {
+    display: block;
+  }
+}
+
+.theme-toggle {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  border-radius: 12px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: var(--card-shadow);
+}
+
+.theme-toggle:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+}
+
+/* Search Module */
+.search-module {
+  margin-bottom: 4rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.search-input-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 800px;
+  margin-bottom: 2rem;
+  box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.05);
+  border-radius: 20px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 1.5rem 1.75rem 1.5rem 4rem;
+  font-size: 1.35rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color); /* Single crisp border */
+  border-radius: 20px; /* Matching wrapper */
+  color: var(--text-primary);
+  outline: none;
+  transition: all 0.2s ease;
+  font-family: 'Scheherazade New', 'Amiri', serif;
+  direction: rtl; /* Force cursor to right */
+  text-align: right;
+}
+
+.search-input::placeholder {
+  opacity: 0.5;
+}
+
+.search-input:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(139, 30, 30, 0.1);
+}
+
+.search-icon {
+  position: absolute;
+  left: 1.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-secondary);
+  opacity: 0.6;
+  z-index: 1;
+}
+
+.mode-selector {
+  display: flex;
+  flex-direction: row-reverse; /* Desktop: Right to Left (Ayah on Right) */
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 600px) {
+  .mode-selector {
+    flex-direction: column; /* Mobile: Top to Bottom (Ayah on Top) */
+    align-items: stretch;
+    width: 100%;
+    max-width: 400px;
+  }
+}
+
+.mode-btn {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 0.75rem 1.5rem;
+  border-radius: 14px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center; /* Center text on mobile or desktop */
+  text-align: center;
+  gap: 0.75rem;
+  box-shadow: var(--card-shadow);
+}
+
+.mode-btn:hover {
+  transform: translateY(-2px);
+  border-color: var(--badge-text);
+}
+
+.mode-btn.active {
+  background: var(--accent-primary);
+  color: white;
+  border-color: var(--badge-text);
+}
+
+.mode-btn:active {
+  transform: scale(0.96); /* Instant visual feedback on phone */
+}
+
+/* Results Content */
+.results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3.5rem; /* Large spacing between results */
+}
+
+.result-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 24px;
+  padding: 2.5rem;
+  box-shadow: var(--card-shadow);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.result-card:hover {
+  transform: scale(1.005);
+  box-shadow: 0 30px 40px -15px rgba(0, 0, 0, 0.08);
+}
+
+.badge-container {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+  direction: rtl;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--badge-bg);
+  color: var(--badge-text);
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.thematic-badge {
+  background: rgba(139, 30, 30, 0.15); /* Slightly darker for themes */
+  border: 1px solid rgba(139, 30, 30, 0.2);
+}
+
+.ayah-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 1rem;
+  direction: rtl;
+}
+
+.results-info {
+  margin-bottom: 3rem;
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 1rem;
+}
+
+.ayah-text {
+  font-size: 2.15rem;
+  font-weight: 500;
+  color: var(--accent-gold);
+  margin-bottom: 2.5rem;
+  padding: 1rem 0;
+  line-height: 1.8;
+  text-align: right;
+  width: 100%;
+}
+
+.ayah-number-circle {
+  display: inline-flex;
+  vertical-align: middle;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1.5px solid var(--accent-gold);
+  border-radius: 50%;
+  font-size: 1.15rem;
+  font-family: 'Inter', sans-serif;
+  color: var(--accent-gold);
+  margin-right: 0.75rem; /* Space before number in RTL flow */
+  font-weight: 700;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.ayah-number-circle::after {
+  content: '\06DD'; /* Ayah end symbol decorator */
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0.2;
+  font-size: 3rem;
+  pointer-events: none;
+}
+
+.tafsir-toggles {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+  direction: rtl;
+}
+
+.tafsir-btn {
+  background: var(--bg-tertiary);
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  padding: 0.6rem 1.25rem;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tafsir-btn:hover {
+  background: var(--border-color);
+  color: var(--text-primary);
+}
+
+.tafsir-btn.active {
+  background: var(--accent-secondary); /* Calm Muted Sage */
+  color: white;
+}
+
+.tafsir-container {
+  background: var(--bg-tertiary);
+  border-radius: 18px;
+  padding: 1.75rem;
+  margin-top: 1.5rem;
+  border-right: 5px solid var(--accent-gold); /* Sage accent */
+  animation: slideDown 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  direction: rtl;
+  text-align: right;
+}
+
+.tafsir-title {
+  font-weight: 800;
+  color: var(--accent-gold);
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+}
+
+.tafsir-text {
+  font-size: 1.25rem;
+  color: var(--text-secondary);
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.loading-state, .error-state, .empty-state {
+  text-align: center;
+  padding: 6rem 2rem;
+  color: var(--text-secondary);
+}
+
+.empty-state .arabic-text {
+  text-align: center !important; /* Center the background ayah */
+  width: 100%;
+}
+
+.empty-state-logo-wrapper {
+  opacity: 0.06; /* Subtle background appearance */
+  margin: 0 auto 4rem;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+/* Background Font Logo for Desktop */
+.empty-state-logo-wrapper .brand-logo-desktop {
+  transform: scale(2.2); 
+}
+
+/* Background Image Logo for Mobile */
+.empty-state-logo-wrapper .brand-logo-mobile {
+  height: 12rem;
+  width: auto;
+}

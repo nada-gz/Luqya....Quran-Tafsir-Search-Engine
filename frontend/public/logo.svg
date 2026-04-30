@@ -1,0 +1,21 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Light background circle */}
+    <circle cx="64" cy="64" r="62" fill="#FDF8F1" stroke="#CBC2B7" stroke-width="1" />
+    
+    {/* Scaled-down logo group to prevent corner clipping */}
+    <g transform="translate(26, 32) scale(0.65)">
+        {/* Lamm (Right) */}
+        <path d="M100 20V80C100 90 90 100 70 100" stroke="#8B1E1E" stroke-width="12" stroke-linecap="round" />
+        
+        {/* Qaf Circle (Search integrated) */}
+        <circle cx="65" cy="70" r="28" stroke="#8B1E1E" stroke-width="14" fill="white" />
+        <path d="M85 90L100 105" stroke="#8B1E1E" stroke-width="16" stroke-linecap="round" />
+        
+        {/* Yeh / Alef (Left) */}
+        <path d="M20 20V100H45" stroke="#8B1E1E" stroke-width="12" stroke-linecap="round" />
+        
+        {/* Tashkeel dots */}
+        <circle cx="60" cy="30" r="8" fill="#8B1E1E" />
+        <circle cx="75" cy="30" r="8" fill="#8B1E1E" />
+    </g>
+</svg>
